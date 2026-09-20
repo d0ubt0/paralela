@@ -2,7 +2,7 @@ use std::{thread, time::Instant};
 
 fn main() {
     // 1. Generar array grande (100,000 elementos) sin librerías externas
-    let n = 10000000;
+    let n = 10_000_0000;
     let mut s: Vec<i32> = Vec::with_capacity(n);
     let mut seed: u64 = 42;
     for _ in 0..n {
@@ -10,7 +10,7 @@ fn main() {
         s.push(((seed >> 33) as i32) % 500_000);
     }
 
-    let k = 455_230;
+    let k = 13252;
     let q = 5;
     let x = 0.5;
 
@@ -46,6 +46,21 @@ fn main() {
     let dur_par = start_par.elapsed();
     println!(
         "Paralelo                 : {} | Tiempo: {:?}",
+        result_par, dur_par
+    );
+    assert_eq!(
+        result_par, expected,
+        "Error: El resultado paralelo no coincide"
+    );
+
+    // 4. Prueba Paralelo
+    let start_par = Instant::now();
+    let mut s_clone = s.clone();
+    s_clone.select_nth_unstable(k);
+    let result_par = s_clone[k];
+    let dur_par = start_par.elapsed();
+    println!(
+        "Select unstable Native version Rust               : {} | Tiempo: {:?}",
         result_par, dur_par
     );
     assert_eq!(
@@ -98,7 +113,7 @@ fn median_of_medians(array: &mut [i32], q: usize) -> i32 {
     let mut medians = Vec::new();
 
     for chunk in array.chunks_mut(q) {
-        chunk.sort();
+        chunk.sort_unstable();
         medians.push(chunk[chunk.len() / 2]);
     }
 
