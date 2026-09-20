@@ -62,30 +62,32 @@ fn sequential_select(mut array: Vec<i32>, q: usize, k: usize) -> i32 {
         return array[k];
     }
 
-    let pivot = median_of_medians(array.clone(), q);
+    let pivot = median_of_medians(&mut array, q);
 
-    let mut s: [Vec<i32>; 3] = [Vec::new(), Vec::new(), Vec::new()];
+    let mut s1 = Vec::new();
+    let mut s2 = Vec::new();
+    let mut s3 = Vec::new();
 
     for number in array {
         if number < pivot {
-            s[0].push(number);
+            s1.push(number);
         } else if number == pivot {
-            s[1].push(number);
+            s2.push(number);
         } else {
-            s[2].push(number);
+            s3.push(number);
         }
     }
 
-    if k < s[0].len() {
-        sequential_select(s[0].clone(), q, k)
-    } else if k < s[0].len() + s[1].len() {
+    if k < s1.len() {
+        sequential_select(s1, q, k)
+    } else if k < s1.len() + s2.len() {
         pivot
     } else {
-        sequential_select(s[2].clone(), q, k - (s[0].len() + s[1].len()))
+        sequential_select(s3, q, k - (s1.len() + s2.len()))
     }
 }
 
-fn median_of_medians(mut array: Vec<i32>, q: usize) -> i32 {
+fn median_of_medians(array: &mut [i32], q: usize) -> i32 {
     let len_array = array.len();
 
     if len_array <= q {
@@ -100,7 +102,7 @@ fn median_of_medians(mut array: Vec<i32>, q: usize) -> i32 {
         medians.push(chunk[chunk.len() / 2]);
     }
 
-    median_of_medians(medians, q)
+    median_of_medians(&mut medians, q)
 }
 
 fn median_of_medians_parallel(mut array: Vec<i32>, q: usize, x: f32) -> i32 {
@@ -118,25 +120,31 @@ fn median_of_medians_parallel(mut array: Vec<i32>, q: usize, x: f32) -> i32 {
     let np = ((len_array as f32).powf(1.0 - x).floor() as usize)
         .max(1)
         .min(available_threads);
+
+    dbg!(np);
     let block_size = (len_array + np - 1) / np;
 
-    let mut threads = Vec::new();
+    let mut medians = Vec::with_capacity(np);
 
-    for chunk in array.chunks(block_size) {
-        let chunk = chunk.to_vec();
+    thread::scope(|scope| {
+        let mut threads = Vec::with_capacity(np);
 
-        let t = thread::spawn(move || median_of_medians(chunk, q));
+        for chunk in array.chunks_mut(block_size) {
+            let t = scope.spawn(move || {
+                let mid = chunk.len() / 2;
 
-        threads.push(t);
-    }
+                chunk.sort();
 
-    let mut medians = Vec::new();
+                chunk[mid]
+            });
 
-    for t in threads {
-        if let Ok(med) = t.join() {
-            medians.push(med);
+            threads.push(t);
         }
-    }
+
+        for t in threads {
+            medians.push(t.join().expect("Error en un hilo"));
+        }
+    });
 
     median_of_medians_parallel(medians, q, x)
 }
@@ -151,23 +159,25 @@ fn parallel_select(mut array: Vec<i32>, q: usize, k: usize, x: f32) -> i32 {
 
     let pivot = median_of_medians_parallel(array.clone(), q, x);
 
-    let mut s: [Vec<i32>; 3] = [Vec::new(), Vec::new(), Vec::new()];
+    let mut s1 = Vec::new();
+    let mut s2 = Vec::new();
+    let mut s3 = Vec::new();
 
     for number in array {
         if number < pivot {
-            s[0].push(number);
+            s1.push(number);
         } else if number == pivot {
-            s[1].push(number);
+            s2.push(number);
         } else {
-            s[2].push(number);
+            s3.push(number);
         }
     }
 
-    if k < s[0].len() {
-        parallel_select(s[0].clone(), q, k, x)
-    } else if k < s[0].len() + s[1].len() {
+    if k < s1.len() {
+        parallel_select(s1, q, k, x)
+    } else if k < s1.len() + s2.len() {
         pivot
     } else {
-        parallel_select(s[2].clone(), q, k - (s[0].len() + s[1].len()), x)
+        parallel_select(s3.clone(), q, k - (s1.len() + s2.len()), x)
     }
 }
